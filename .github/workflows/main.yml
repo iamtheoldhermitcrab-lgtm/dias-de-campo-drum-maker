@@ -1,0 +1,55 @@
+name: Compilar plugin
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar
+        run: cmake -B build -A x64
+
+      - name: Compilar VST3
+        run: cmake --build build --config Release --target DiasDeCampoDrumMaker_VST3 --parallel
+
+      - name: Preparar descarga
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item -Recurse "build/DiasDeCampoDrumMaker_artefacts/Release/VST3/Dias de Campo Drum Maker.vst3" dist/
+          Copy-Item LEEME.md dist/
+
+      - name: Subir plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiasDeCampoDrumMaker-VST3-Windows
+          path: dist
+
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Compilar VST3 y AU
+        run: cmake --build build --target DiasDeCampoDrumMaker_VST3 DiasDeCampoDrumMaker_AU --parallel
+
+      - name: Firmar y empaquetar
+        run: |
+          A="build/DiasDeCampoDrumMaker_artefacts/Release"
+          codesign --force --deep -s - "$A/VST3/Dias de Campo Drum Maker.vst3"
+          codesign --force --deep -s - "$A/AU/Dias de Campo Drum Maker.component"
+          mkdir -p dist
+          cp -R "$A/VST3/Dias de Campo Drum Maker.vst3" "$A/AU/Dias de Campo Drum Maker.component" LEEME.md dist/
+
+      - name: Subir plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiasDeCampoDrumMaker-Mac
+          path: dist
